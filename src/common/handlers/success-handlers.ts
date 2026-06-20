@@ -25,6 +25,10 @@ export class SuccessResponseHandler {
   static created<T>(resource: string, data?: T): ApiResponse<T> {
     return this.success(`${resource} created successfully`, data);
   }
+  static uploaded<T>(resource: string, data?: T): ApiResponse<T> {
+    return this.success(`${resource} uploaded successfully`, data);
+  }
+
   static login<T>(resource: string, data?: T): ApiResponse<T> {
     return this.success(`${resource} login successfully`, data);
   }

@@ -349,7 +349,7 @@ export class UsersService {
     }, 'Failed to login with Google');
   }
 
-  //reset your password
+  //reset your password 
   async resetPassword(resetPasswordData: resetPasswordDto): Promise<any>{
     return ErrorHandler.execute(async () => {
 

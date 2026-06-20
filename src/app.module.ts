@@ -5,6 +5,15 @@
   import { DatabaseModule } from './modules/database/database.module';
   import { UsersModule } from './modules/users/users.module';
 import { MailService } from './common/services/mail/mail.service';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { StorageModule } from './modules/storage/storage.module';
+import { ParsersModule } from './modules/parsers/parsers.module';
+import { ChunkingModule } from './modules/chunking/chunking.module';
+import { EmbeddingsModule } from './modules/embeddings/embeddings.module';
+import { VectorStoreModule } from './modules/vector-store/vector-store.module';
+import { RagModule } from './modules/rag/rag.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 
 // hello world
@@ -13,6 +22,15 @@ import { MailService } from './common/services/mail/mail.service';
       ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
       DatabaseModule,
       UsersModule,
+      DocumentsModule,
+      StorageModule,
+      ParsersModule,
+      ChunkingModule,
+      EmbeddingsModule,
+      VectorStoreModule,
+      RagModule,
+      ChatModule,
+      AdminModule,
     ],
     controllers: [AppController],
     providers: [AppService, MailService],
