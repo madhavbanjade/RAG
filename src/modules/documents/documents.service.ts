@@ -9,6 +9,7 @@ import { SuccessResponseHandler } from 'src/common/handlers/success-handlers';
 import * as fs from 'fs';
 import { join } from 'path';
 import { DocumentParserService } from 'src/common/services/document-parser.service';
+import { createHash } from 'crypto';
 
 @Injectable()
 export class DocumentsService {
@@ -17,6 +18,11 @@ export class DocumentsService {
     private readonly documentModel: Model<IDocument>,
     private readonly documentParserService: DocumentParserService,
   ) {}
+
+  private calculateFileHash(filePath: string): string {
+    const fileBuffer = fs.readFileSync(filePath);
+    return createHash('sha256').update(fileBuffer).digest('hex');
+  }
 
   //the documents service is created to get metasdata from the pdf. the only purpose of the modules.
   async create(documentData: CreateDocumentDto, userId: string) {
@@ -128,16 +134,27 @@ export class DocumentsService {
         throw ErrorHandler.operationFailed('File is Required !');
       }
 
+      if (!file || !file.originalname || !file.path) {
+        throw new BadRequestException('Invalid file upload');
+      }
+
+      const fileHash = this.calculateFileHash(file.path);
+
+      const isDuplicate = document.files.some((f) => f.fileHash === fileHash);
+      if (isDuplicate) {
+        fs.unlinkSync(file.path);
+        throw new BadRequestException(
+          `Duplicate file detected: "${file.originalname}" has already been uploaded to this document`,
+        );
+      }
+
       document.files.push({
         originalName: file.originalname,
         filePath: file.path.replace(process.cwd(), ''),
         mimeType: file.mimetype,
         fileSize: file.size,
+        fileHash,
       });
-
-      if (!file || !file.originalname || !file.path) {
-        throw new BadRequestException('Invalid file upload');
-      }
 
       document.status = 'UPLOADED';
 
@@ -178,15 +195,52 @@ export class DocumentsService {
         throw ErrorHandler.operationFailed('No valid files found!');
       }
 
-      const mapped = validFiles.map((file) => ({
-        originalName: file.originalname,
-        filePath: file.path.replace(process.cwd(), ''),
-        mimeType: file.mimetype,
-        fileSize: file.size,
-      }));
+      const mapped = validFiles.map((file) => {
+        const fileHash = this.calculateFileHash(file.path);
+        return {
+          originalName: file.originalname,
+          filePath: file.path.replace(process.cwd(), ''),
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          fileHash,
+        };
+      });
 
-      // ❌ REMOVE THIS (it was wrong variable + unnecessary)
-      // document.files = document.files.filter(...)
+      // ✅ Check for duplicates in existing document files
+      const existingHashes = document.files.map((f) => f.fileHash);
+      const newHashes = mapped.map((f) => f.fileHash);
+
+      for (const newFile of mapped) {
+        if (existingHashes.includes(newFile.fileHash)) {
+          validFiles.forEach((f) => {
+            try {
+              fs.unlinkSync(f.path);
+            } catch (e) {
+              // ignore cleanup errors
+            }
+          });
+          throw new BadRequestException(
+            `Duplicate file detected: "${newFile.originalName}" has already been uploaded to this document`,
+          );
+        }
+      }
+
+      // ✅ Check for duplicates within the new files being uploaded
+      const duplicateInBatch = newHashes.some(
+        (hash, index) => newHashes.indexOf(hash) !== index,
+      );
+      if (duplicateInBatch) {
+        validFiles.forEach((f) => {
+          try {
+            fs.unlinkSync(f.path);
+          } catch (e) {
+            // ignore cleanup errors
+          }
+        });
+        throw new BadRequestException(
+          'Duplicate files detected within this batch upload',
+        );
+      }
 
       // ✅ push correctly
       document.files.push(...mapped);

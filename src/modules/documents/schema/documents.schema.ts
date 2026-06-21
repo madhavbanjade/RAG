@@ -18,6 +18,10 @@ const fileSchema = new mongoose.Schema({
             type: Number,
             required: false
         },
+        fileHash:{
+            type: String,
+            required: false
+        },
 },
 {_id: false}
 )
@@ -27,6 +31,7 @@ export interface IFile {
   filePath?: string;
   mimeType?: string;
   fileSize?: number;
+  fileHash?: string;
 }
 
 
