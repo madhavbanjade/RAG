@@ -26,11 +26,16 @@ export class DocumentsService {
 
   //the documents service is created to get metasdata from the pdf. the only purpose of the modules.
   async create(documentData: CreateDocumentDto, userId: string) {
+  async create(documentData: CreateDocumentDto, userId: string) {
     return ErrorHandler.execute(async () => {
       const document = await this.documentModel.create({
         ...documentData,
         files: [],
         uploadedBy: userId,
+      });
+
+      return SuccessResponseHandler.created('Documents', document);
+    }, 'Failed to Create Document');
       });
 
       return SuccessResponseHandler.created('Documents', document);
@@ -42,16 +47,25 @@ export class DocumentsService {
       const documents = await this.documentModel
         .find()
         .populate('uploadedBy', 'name email role');
+      const documents = await this.documentModel
+        .find()
+        .populate('uploadedBy', 'name email role');
 
+      if (documents.length === 0) {
+        throw ErrorHandler.notFound('Documents');
       if (documents.length === 0) {
         throw ErrorHandler.notFound('Documents');
       }
 
       return SuccessResponseHandler.retrived('Documents', documents);
     }, 'Failed to getall documents');
+      return SuccessResponseHandler.retrived('Documents', documents);
+    }, 'Failed to getall documents');
   }
 
   async findOne(id: string) {
+    return ErrorHandler.execute(async () => {
+      const document = await this.documentModel.findById(id);
     return ErrorHandler.execute(async () => {
       const document = await this.documentModel.findById(id);
       console.log(await this.documentModel.findById(id));
@@ -61,18 +75,30 @@ export class DocumentsService {
       }
       return SuccessResponseHandler.retrived('Document', document);
     }, 'Failed to get one document');
+      if (!document) {
+        throw ErrorHandler.notFound('Document');
+      }
+      return SuccessResponseHandler.retrived('Document', document);
+    }, 'Failed to get one document');
   }
 
+  async findMyDocuments(userId: string) {
   async findMyDocuments(userId: string) {
     return ErrorHandler.execute(async () => {
       const myDocument = await this.documentModel.find({
         uploadedBy: userId,
       });
+        uploadedBy: userId,
+      });
 
+      if (myDocument.length === 0) {
+        throw ErrorHandler.notFound('My Documents');
       if (myDocument.length === 0) {
         throw ErrorHandler.notFound('My Documents');
       }
 
+      return SuccessResponseHandler.retrived('myDocs', myDocument);
+    }, 'Failed to get my Document');
       return SuccessResponseHandler.retrived('myDocs', myDocument);
     }, 'Failed to get my Document');
   }
@@ -81,8 +107,14 @@ export class DocumentsService {
     return ErrorHandler.execute(async () => {
       const document = await this.documentModel.findByIdAndUpdate(
         id,
+        id,
         documentData,
         {
+          new: true,
+        },
+      );
+      return SuccessResponseHandler.updated('Documents', document);
+    }, 'Failed to update documents');
           new: true,
         },
       );
@@ -93,11 +125,22 @@ export class DocumentsService {
   async remove(id: string) {
     return ErrorHandler.execute(async () => {
       const document = await this.documentModel.findById(id);
+  async remove(id: string) {
+    return ErrorHandler.execute(async () => {
+      const document = await this.documentModel.findById(id);
 
       if (!document) {
         throw ErrorHandler.notFound('Document');
       }
+      if (!document) {
+        throw ErrorHandler.notFound('Document');
+      }
 
+      // 1. Delete files from disk
+      if (document.files && document.files.length > 0) {
+        for (const file of document.files) {
+          if (file.filePath) {
+            const fullPath = join(process.cwd(), file.filePath);
       // 1. Delete files from disk
       if (document.files && document.files.length > 0) {
         for (const file of document.files) {
@@ -114,17 +157,37 @@ export class DocumentsService {
           }
         }
       }
+            try {
+              if (fs.existsSync(fullPath)) {
+                fs.unlinkSync(fullPath); // delete file
+              }
+            } catch (err) {
+              console.error(`Failed to delete file: ${fullPath}`, err);
+            }
+          }
+        }
+      }
 
+      // 2. Delete document from DB
+      const deleted = await this.documentModel.findByIdAndDelete(id);
       // 2. Delete document from DB
       const deleted = await this.documentModel.findByIdAndDelete(id);
 
       return SuccessResponseHandler.deleted('Document', deleted);
     }, 'Failed to delete document');
   }
+      return SuccessResponseHandler.deleted('Document', deleted);
+    }, 'Failed to delete document');
+  }
 
   //upload-single docs
   async uploadFile(id: string, file: Express.Multer.File) {
+  async uploadFile(id: string, file: Express.Multer.File) {
     return ErrorHandler.execute(async () => {
+      const document = await this.documentModel.findById(id);
+      if (!document) {
+        throw ErrorHandler.notFound('Document');
+      }
       const document = await this.documentModel.findById(id);
       if (!document) {
         throw ErrorHandler.notFound('Document');
@@ -165,9 +228,17 @@ export class DocumentsService {
         file.path,
         file.mimetype,
       );
+      //parse after save
+      const parsed = await this.documentParserService.extract(
+        file.path,
+        file.mimetype,
+      );
 
       await this.documentModel.findByIdAndUpdate(id, { status: 'PARSED' });
+      await this.documentModel.findByIdAndUpdate(id, { status: 'PARSED' });
 
+      return SuccessResponseHandler.uploaded('Document', parsed);
+    }, 'Failed to upload single file');
       return SuccessResponseHandler.uploaded('Document', parsed);
     }, 'Failed to upload single file');
   }
@@ -176,11 +247,21 @@ export class DocumentsService {
   async uploadMultipleFile(id: string, files: Express.Multer.File[]) {
     return ErrorHandler.execute(async () => {
       const document = await this.documentModel.findById(id);
+  async uploadMultipleFile(id: string, files: Express.Multer.File[]) {
+    return ErrorHandler.execute(async () => {
+      const document = await this.documentModel.findById(id);
 
       if (!document) {
         throw ErrorHandler.notFound('Document');
       }
+      if (!document) {
+        throw ErrorHandler.notFound('Document');
+      }
 
+      // ✅ IMPORTANT: validate files properly
+      if (!files || files.length === 0) {
+        throw ErrorHandler.operationFailed('Files are required!');
+      }
       // ✅ IMPORTANT: validate files properly
       if (!files || files.length === 0) {
         throw ErrorHandler.operationFailed('Files are required!');
@@ -190,7 +271,14 @@ export class DocumentsService {
       const validFiles = files.filter(
         (file) => file?.originalname && file?.path,
       );
+      // ✅ safety: remove invalid files if any
+      const validFiles = files.filter(
+        (file) => file?.originalname && file?.path,
+      );
 
+      if (validFiles.length === 0) {
+        throw ErrorHandler.operationFailed('No valid files found!');
+      }
       if (validFiles.length === 0) {
         throw ErrorHandler.operationFailed('No valid files found!');
       }
@@ -244,9 +332,13 @@ export class DocumentsService {
 
       // ✅ push correctly
       document.files.push(...mapped);
+      // ✅ push correctly
+      document.files.push(...mapped);
 
       document.status = 'UPLOADED';
+      document.status = 'UPLOADED';
 
+      await document.save();
       await document.save();
 
 
