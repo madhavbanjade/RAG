@@ -62,6 +62,7 @@ export class DocumentsController {
     return this.documentsService.findOne(id);
   }
 
+  // check
 
   @Patch(':id')
   @UseGuards(ProtectLoginGuard)
