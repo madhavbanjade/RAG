@@ -14,7 +14,9 @@ export class DocumentsController {
   @Post()
   @UseGuards(ProtectLoginGuard)
   create(@Body() createDocumentDto: CreateDocumentDto, @Request() req) {
-    return this.documentsService.create(createDocumentDto, req.user.id);
+  const userId = req['user'].id; 
+
+    return this.documentsService.create(createDocumentDto, userId);
   }
 
 //upload single

@@ -4,6 +4,7 @@ import { DocumentsController } from './documents.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { documentSchema } from './schema/documents.schema';
 import { JwtService } from '@nestjs/jwt';
+import { DocumentParserService } from 'src/common/services/document-parser.service';
 
 @Module({
   imports:[
@@ -15,7 +16,7 @@ import { JwtService } from '@nestjs/jwt';
     ])
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService, JwtService],
+  providers: [DocumentsService, JwtService, DocumentParserService],
   exports:[DocumentsService]
 })
 export class DocumentsModule {}

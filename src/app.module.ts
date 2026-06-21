@@ -14,6 +14,7 @@ import { VectorStoreModule } from './modules/vector-store/vector-store.module';
 import { RagModule } from './modules/rag/rag.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { DocumentParserService } from './common/services/document-parser.service';
 
 
 // hello world
@@ -33,6 +34,6 @@ import { AdminModule } from './modules/admin/admin.module';
       AdminModule,
     ],
     controllers: [AppController],
-    providers: [AppService, MailService],
+    providers: [AppService, MailService, DocumentParserService],
   })
   export class AppModule {}
