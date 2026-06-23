@@ -54,7 +54,7 @@ export const chunkSchema = new mongoose.Schema(
 
 
 export interface IChunk extends mongoose.Document{
-    documentID: string;
+    documentId: string;
     chunkIndex: number;
     content: string;
     tokenCount: number;

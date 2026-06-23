@@ -6,6 +6,7 @@ import { documentSchema } from './schema/documents.schema';
 import { JwtService } from '@nestjs/jwt';
 import { DocumentParserService } from 'src/common/services/document-parser.service';
 import { ChunkingModule } from '../chunking/chunking.module';
+import { EmbeddingModule } from '../embeddings/embeddings.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ChunkingModule } from '../chunking/chunking.module';
       },
     ]),
     ChunkingModule,
+    EmbeddingModule
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, JwtService, DocumentParserService],

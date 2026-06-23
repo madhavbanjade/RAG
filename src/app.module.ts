@@ -7,9 +7,9 @@
 import { MailService } from './common/services/mail/mail.service';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { StorageModule } from './modules/storage/storage.module';
-import { ParsersModule } from './modules/parsers/parsers.module';
+
 import { ChunkingModule } from './modules/chunking/chunking.module';
-import { EmbeddingsModule } from './modules/embeddings/embeddings.module';
+import { EmbeddingModule } from './modules/embeddings/embeddings.module';
 import { VectorStoreModule } from './modules/vector-store/vector-store.module';
 import { RagModule } from './modules/rag/rag.module';
 import { ChatModule } from './modules/chat/chat.module';
@@ -25,9 +25,8 @@ import { DocumentParserService } from './common/services/document-parser.service
       UsersModule,
       DocumentsModule,
       StorageModule,
-      ParsersModule,
       ChunkingModule,
-      EmbeddingsModule,
+      EmbeddingModule,
       VectorStoreModule,
       RagModule,
       ChatModule,

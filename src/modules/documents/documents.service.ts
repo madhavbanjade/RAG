@@ -11,6 +11,7 @@ import { join } from 'path';
 import { DocumentParserService } from 'src/common/services/document-parser.service';
 import { createHash } from 'crypto';
 import { ChunkingService } from '../chunking/chunking.service';
+import { EmbeddingService } from '../embeddings/embeddings.service';
 
 @Injectable()
 export class DocumentsService {
@@ -18,7 +19,8 @@ export class DocumentsService {
     @InjectModel('Document')
     private readonly documentModel: Model<IDocument>,
     private readonly documentParserService: DocumentParserService,
-    private readonly chunkingService: ChunkingService
+    private readonly chunkingService: ChunkingService,
+    private readonly embeddingService: EmbeddingService,
   ) {}
 
   private calculateFileHash(filePath: string): string {
@@ -168,17 +170,16 @@ export class DocumentsService {
         file.mimetype,
       );
 
-      console.log("Parsed", parsed)
+      console.log('Parsed', parsed);
 
-  
       await this.documentModel.findByIdAndUpdate(id, { status: 'PARSED' });
 
-      await this.chunkingService.processDocument(
-        document.id,
-        parsed.text
-      )
-  await this.documentModel.findByIdAndUpdate(id, { status: 'CHUNKED' });
+      await this.chunkingService.processDocument(document.id, parsed.text);
+      await this.documentModel.findByIdAndUpdate(id, { status: 'CHUNKED' });
 
+      await this.embeddingService.processDocument(document.id);
+
+      await this.documentModel.findByIdAndUpdate(id, { status: 'EMBEDDED' });
 
       return SuccessResponseHandler.uploaded('Document', parsed);
     }, 'Failed to upload single file');
@@ -261,43 +262,39 @@ export class DocumentsService {
 
       await document.save();
 
-    //parse each files
-const parsedResults: Array<{
-  originalName: string | undefined;
-  text: string;
-  meta: Record<string, unknown>;
-  warnings?: string[]
-}>= [];
+      //parse each files
+      const parsedResults: Array<{
+        originalName: string | undefined;
+        text: string;
+        meta: Record<string, unknown>;
+        warnings?: string[];
+      }> = [];
 
+      for (const file of validFiles) {
+        const parsed = await this.documentParserService.extract(
+          file.path,
+          file.mimetype,
+        );
 
+        parsedResults.push({
+          originalName: file.originalname,
+          ...parsed,
+        });
 
+        await this.documentModel.findByIdAndUpdate(id, { status: 'PARSED' });
 
-for(const file of validFiles){
-  const parsed = await this.documentParserService.extract(
-    file.path,
-    file.mimetype
-  );
-  parsedResults.push({
-    originalName: file.originalname,
-    ...parsed,
-  });
-  await this.chunkingService.processDocument(
-    document.id,
-    parsed.text
-  );
-}
+        await this.chunkingService.processDocument(document.id, parsed.text);
 
-await this.documentModel.findByIdAndUpdate(id, {status: "PARSED"})
-  await this.documentModel.findByIdAndUpdate(id, { status: 'CHUNKED' });
+        await this.documentModel.findByIdAndUpdate(id, { status: 'CHUNKED' });
 
+        await this.embeddingService.processDocument(document.id);
 
+        await this.documentModel.findByIdAndUpdate(id, { status: 'EMBEDDED' });
+      }
 
-
-      return SuccessResponseHandler.uploaded('Multiple Files',
-        {
-        parsed: parsedResults
-        }
-      );
+      return SuccessResponseHandler.uploaded('Multiple Files', {
+        parsed: parsedResults,
+      });
     }, 'Failed to upload multiple files');
     //hello
   }

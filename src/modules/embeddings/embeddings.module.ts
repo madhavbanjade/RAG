@@ -1,9 +1,26 @@
 import { Module } from '@nestjs/common';
-import { EmbeddingsService } from './embeddings.service';
-import { EmbeddingsController } from './embeddings.controller';
+
+import { MongooseModule } from '@nestjs/mongoose';
+import { embeddingSceham } from './schema/embeddings.schema';
+import { EmbeddingController } from './embeddings.controller';
+import { EmbeddingService } from './embeddings.service';
+import { chunkSchema } from '../chunking/schema/chunk.schema';
 
 @Module({
-  controllers: [EmbeddingsController],
-  providers: [EmbeddingsService],
+  imports:[
+    MongooseModule.forFeature([
+      {
+        name: "Embedding",
+        schema: embeddingSceham
+      },
+      {
+        name: "Chunk",
+        schema: chunkSchema
+      },
+    ])
+  ],
+  controllers: [EmbeddingController],
+  providers: [EmbeddingService],
+  exports: [EmbeddingService],
 })
-export class EmbeddingsModule {}
+export class EmbeddingModule {}
