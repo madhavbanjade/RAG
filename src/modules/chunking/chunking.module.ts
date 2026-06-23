@@ -1,9 +1,18 @@
 import { Module } from '@nestjs/common';
 import { ChunkingService } from './chunking.service';
-import { ChunkingController } from './chunking.controller';
+import { MongooseModule } from '@nestjs/mongoose';
+import { chunkSchema } from './schema/chunk.schema';
 
 @Module({
-  controllers: [ChunkingController],
+  imports: [
+    MongooseModule.forFeature([
+      {
+        name: 'Chunk',
+        schema: chunkSchema,
+      },
+    ]),
+  ],
   providers: [ChunkingService],
+  exports: [ChunkingService],
 })
 export class ChunkingModule {}

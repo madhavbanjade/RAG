@@ -45,7 +45,6 @@
     "nodemailer": "^9.0.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^6.0.227",
     "redis": "^6.0.0",
     "reflect-metadata": "^0.2.2",

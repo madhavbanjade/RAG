@@ -5,18 +5,20 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { documentSchema } from './schema/documents.schema';
 import { JwtService } from '@nestjs/jwt';
 import { DocumentParserService } from 'src/common/services/document-parser.service';
+import { ChunkingModule } from '../chunking/chunking.module';
 
 @Module({
-  imports:[
+  imports: [
     MongooseModule.forFeature([
       {
-        name: "Document",
-        schema: documentSchema
-      }
-    ])
+        name: 'Document',
+        schema: documentSchema,
+      },
+    ]),
+    ChunkingModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, JwtService, DocumentParserService],
-  exports:[DocumentsService]
+  exports: [DocumentsService],
 })
 export class DocumentsModule {}
