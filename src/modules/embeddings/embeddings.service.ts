@@ -5,6 +5,7 @@ import { Embedding } from './schema/embeddings.schema';
 import { IChunk } from '../chunking/schema/chunk.schema';
 import { Model } from 'mongoose';
 import { ErrorHandler } from 'src/common/handlers/error-handlers';
+import { VectorStoreService } from '../vector-store/vector-store.service';
 
 @Injectable()
 export class EmbeddingService {
@@ -14,6 +15,8 @@ export class EmbeddingService {
 
     @InjectModel('Chunk')
     private readonly chunkModel: Model<IChunk>,
+
+    private readonly vectorStoreService: VectorStoreService
   ) {}
 
   //generateEmbeddings
@@ -45,29 +48,40 @@ export class EmbeddingService {
     });
 
     if (!chunks.length) {
-      return ErrorHandler.notFound('Chunks');
+       return {
+    success: true,
+    embeddedChunk: 0,
+  };
     }
 
     let embeddedCount = 0;
     for (const chunk of chunks) {
       const vector = await this.generateEmbedding(chunk.content);
 
-      await this.embeddingModel.create({
-        documentId: chunk.documentId?.toString(),
-        chunkId: chunk._id?.toString(),
-        content: chunk.content,
-        vector,
-        model: 'bge-m3',
-        dimensions: vector.length,
-      });
+   
 
-      ((chunk.embeddingStatus = 'EMBEDDED'),
-        (chunk.embeddingModel = 'bge-m3'),
-        (chunk.vectorDemensions = vector.length));
+             //store in qdrant
+      await this.vectorStoreService.storeEmbedding(
+        chunk._id!.toString(),
+        chunk.documentId!.toString(),
+        vector,
+        chunk.content,
+
+      )
+
+    
+
+
+      chunk.embeddingStatus = 'EMBEDDED';
+        chunk.embeddingModel = 'bge-m3';
+        chunk.vectorDemensions = vector.length;
 
       await chunk.save();
 
       embeddedCount++;
+
+      
+   
     }
 
     return {

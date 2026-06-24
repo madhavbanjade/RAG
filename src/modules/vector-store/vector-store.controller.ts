@@ -1,34 +1,29 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+} from '@nestjs/common';
 import { VectorStoreService } from './vector-store.service';
-import { CreateVectorStoreDto } from './dto/create-vector-store.dto';
-import { UpdateVectorStoreDto } from './dto/update-vector-store.dto';
+import { EmbeddingService } from '../embeddings/embeddings.service';
 
 @Controller('vector-store')
 export class VectorStoreController {
-  constructor(private readonly vectorStoreService: VectorStoreService) {}
+  constructor(
+    private readonly vectorStoreService: VectorStoreService,
+    private readonly embeddingService: EmbeddingService,
+  ) {}
 
-  @Post()
-  create(@Body() createVectorStoreDto: CreateVectorStoreDto) {
-    return this.vectorStoreService.create(createVectorStoreDto);
+
+  @Post('test-search')
+  async testSearch(@Body() body: { query: string }) {
+    const vector = await this.embeddingService.generateEmbedding(body.query);
+    return this.vectorStoreService.search(vector);
   }
 
-  @Get()
-  findAll() {
-    return this.vectorStoreService.findAll();
+  @Get('points')
+  async getPoints() {
+    return this.vectorStoreService.getPoints();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.vectorStoreService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateVectorStoreDto: UpdateVectorStoreDto) {
-    return this.vectorStoreService.update(+id, updateVectorStoreDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.vectorStoreService.remove(+id);
-  }
 }

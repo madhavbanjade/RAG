@@ -1,13 +1,16 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 
 import { MongooseModule } from '@nestjs/mongoose';
 import { embeddingSceham } from './schema/embeddings.schema';
 import { EmbeddingController } from './embeddings.controller';
 import { EmbeddingService } from './embeddings.service';
 import { chunkSchema } from '../chunking/schema/chunk.schema';
+import { VectorStoreModule } from '../vector-store/vector-store.module';
+
 
 @Module({
   imports:[
+    forwardRef(() => VectorStoreModule),
     MongooseModule.forFeature([
       {
         name: "Embedding",

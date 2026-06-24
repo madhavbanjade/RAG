@@ -28,6 +28,7 @@
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.24",
+    "@qdrant/js-client-rest": "^1.18.0",
     "@types/passport-google-oauth20": "^2.0.17",
     "axios": "^1.18.1",
     "bcryptjs": "^3.0.3",
