@@ -85,7 +85,6 @@ export class UsersController {
   @Get('google-callback')
   @UseGuards(AuthGuard('google'))
   async googleCallback(@Req() req: any, @Res() res: express.Response) {
-    console.log('Google callback received:', req.user);
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -96,12 +95,9 @@ export class UsersController {
     try {
       const result = await this.usersService.googleSignIn(req.user);
       setAuthCookies(req, res, result.data.access_token, result.data.refresh_token);
-      return res.redirect(
-        `${frontendUrl}/login?access_token=${result.data.access_token}&refresh_token=${result.data.refresh_token}`,
-      );
-    } catch (error: any) {
-      console.error('Google login error:', error);
-      return res.redirect(`${frontendUrl}/login?error=${error.message}`);
+      return res.redirect(`${frontendUrl}/dashboard`);
+    } catch {
+      return res.redirect(`${frontendUrl}/login?error=authentication_failed`);
     }
   }
 

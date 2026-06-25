@@ -1,9 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { StorageService } from './storage.service';
 import { CreateStorageDto } from './dto/create-storage.dto';
 import { UpdateStorageDto } from './dto/update-storage.dto';
+import { ProtectLoginGuard } from 'src/common/guards/auth.guards';
+import { RoleProtectGuard } from 'src/common/guards/role-gaurds';
 
 @Controller('storage')
+@UseGuards(ProtectLoginGuard, RoleProtectGuard)
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 

@@ -21,6 +21,7 @@ export class DocumentsController {
 
 //upload single
   @Post(':id/upload')
+  @UseGuards(ProtectLoginGuard)
   @UploadSingle('file')
   uploadFile(
     @Param('id') id: string,
@@ -32,6 +33,7 @@ export class DocumentsController {
 
 //upload multiple
   @Post(':id/upload-multiple')
+  @UseGuards(ProtectLoginGuard)
   @UploadMultiple('files', 5)
   uploadMultiple(
     @Param('id') id: string,

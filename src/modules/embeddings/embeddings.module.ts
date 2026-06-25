@@ -6,6 +6,7 @@ import { EmbeddingController } from './embeddings.controller';
 import { EmbeddingService } from './embeddings.service';
 import { chunkSchema } from '../chunking/schema/chunk.schema';
 import { VectorStoreModule } from '../vector-store/vector-store.module';
+import { JwtService } from '@nestjs/jwt';
 
 
 @Module({
@@ -23,7 +24,7 @@ import { VectorStoreModule } from '../vector-store/vector-store.module';
     ])
   ],
   controllers: [EmbeddingController],
-  providers: [EmbeddingService],
+  providers: [EmbeddingService, JwtService],
   exports: [EmbeddingService],
 })
 export class EmbeddingModule {}

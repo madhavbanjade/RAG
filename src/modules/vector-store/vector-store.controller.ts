@@ -4,17 +4,20 @@ import {
   Post,
   Body,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { VectorStoreService } from './vector-store.service';
 import { EmbeddingService } from '../embeddings/embeddings.service';
+import { ProtectLoginGuard } from 'src/common/guards/auth.guards';
+import { RoleProtectGuard } from 'src/common/guards/role-gaurds';
 
 @Controller('vector-store')
+@UseGuards(ProtectLoginGuard, RoleProtectGuard)
 export class VectorStoreController {
   constructor(
     private readonly vectorStoreService: VectorStoreService,
     private readonly embeddingService: EmbeddingService,
   ) {}
-
 
   @Post('test-search')
   async testSearch(@Body() body: { query: string }) {
@@ -27,9 +30,8 @@ export class VectorStoreController {
     return this.vectorStoreService.getPoints();
   }
 
-@Delete('collection')
-async deleteCollection() {
-  return this.vectorStoreService.deleteCollection();
-}
-
+  @Delete('collection')
+  async deleteCollection() {
+    return this.vectorStoreService.deleteCollection();
+  }
 }

@@ -17,7 +17,6 @@ export class ProtectLoginGuard implements CanActivate {
 
     //refresh token
     const refresh_token = request.cookies.refresh_token;
-    console.log("refresh token is", refresh_token)
 
     if (!refresh_token) {
       throw new UnauthorizedException("Not logged in")
@@ -48,13 +47,12 @@ export class ProtectLoginGuard implements CanActivate {
           secret: this.configService.getOrThrow<string>('jwtAccessSecret'),
         });
       } catch {
-        ErrorHandler.unauthorized('Invalid access token');
-      } 
+        throw ErrorHandler.unauthorized('Invalid access token');
+      }
     }
 
  // Attach user to request
-  request['user'] = { ...payload, id: String(payload.id) }  //added
-    console.log("request.user set →", request['user']) ;
+  request['user'] = { ...payload, id: String(payload.id) };
     return true;
   }
 }
