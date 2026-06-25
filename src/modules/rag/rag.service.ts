@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CreateRagDto } from './dto/create-rag.dto';
-import { UpdateRagDto } from './dto/update-rag.dto';
 import { EmbeddingService } from '../embeddings/embeddings.service';
 import { VectorStoreService } from '../vector-store/vector-store.service';
 import axios from 'axios';
@@ -24,7 +22,7 @@ export class RagService {
     const results = await this.vectorStoreService.search(queryVector);
 
     //build context
-    const context = results.map((r: any) => r.payload.content).join('\n\n');
+    const context = results.map((r: any) => r.content).join('\n\n');
 
     //prompt
     const prompt = `
@@ -44,7 +42,11 @@ Question: ${question}
 const answer = await this.llmService.generate(prompt);
   return {
     answer,
-    sources: results.length
+    sources: results.map(r => ({
+      documentId: r.documentId,
+      chunkId: r.chunkId,
+      score: r.score
+    }))
   }
 
 

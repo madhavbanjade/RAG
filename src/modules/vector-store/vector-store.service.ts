@@ -86,9 +86,11 @@ async search(vector: number[]){
     limit: 3,
     with_payload: true
   })
-  return results.points.filter((item) => item.score > 0.5).map((r:any) => ({
-    score: r.score,
-    payload: r.payload,
+  return results.points.filter((item) => item.score > 0.5).map((item) => ({
+    score: item.score,
+    documentId: item.payload?.documentId,
+    chunkId: item.payload?.chunkId,
+    content: item.payload?.content
   }))
 }
 
