@@ -39,6 +39,7 @@
     "dns": "^0.2.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "groq-sdk": "^1.3.0",
     "ioredis": "^5.11.1",
     "mammoth": "^1.12.0",
     "mongodb": "^7.2.0",

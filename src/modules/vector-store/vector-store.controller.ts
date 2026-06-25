@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Delete,
 } from '@nestjs/common';
 import { VectorStoreService } from './vector-store.service';
 import { EmbeddingService } from '../embeddings/embeddings.service';
@@ -25,5 +26,10 @@ export class VectorStoreController {
   async getPoints() {
     return this.vectorStoreService.getPoints();
   }
+
+@Delete('collection')
+async deleteCollection() {
+  return this.vectorStoreService.deleteCollection();
+}
 
 }

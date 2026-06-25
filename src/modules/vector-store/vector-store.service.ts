@@ -86,7 +86,24 @@ async search(vector: number[]){
     limit: 3,
     with_payload: true
   })
-  return results.points.filter((item) => item.score > 0.5);
+  return results.points.filter((item) => item.score > 0.5).map((r:any) => ({
+    score: r.score,
+    payload: r.payload,
+  }))
+}
+
+async deleteCollection() {
+  try {
+    const result = await this.client.deleteCollection('documents');
+
+    return {
+      success: true,
+      message: 'Collection deleted successfully',
+      result,
+    };
+  } catch (error) {
+    throw new Error(`Failed to delete collection: ${error}`);
+  }
 }
  
 
