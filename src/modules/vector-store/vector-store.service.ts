@@ -83,16 +83,19 @@ async getPoints(){
 async search(vector: number[]){
   const results = await this.client.query('documents', {
     query: vector,
-    limit: 3,
+    limit: 5,
     with_payload: true
   })
-  return results.points.filter((item) => item.score > 0.5).map((item) => ({
+  return results.points.filter((item) => item.score >= 0.5).map((item) => ({
     score: item.score,
     documentId: item.payload?.documentId,
     chunkId: item.payload?.chunkId,
     content: item.payload?.content
   }))
+
+  
 }
+
 
 async deleteCollection() {
   try {

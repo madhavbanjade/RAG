@@ -12,7 +12,7 @@ export const messageSchema = new mongoose.Schema({
     role:{
         type: String,
         enum : ['user', 'assistant'],
-        requird: true
+        required: true
     },
     content:{
         type: String,
