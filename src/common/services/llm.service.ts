@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Groq from 'groq-sdk';
 
+type ChatMessage = {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+};
+
 @Injectable()
 export class LlmService {
   constructor(
@@ -51,5 +56,48 @@ if (!content) {
 }
 
 return content;
+  }
+
+
+  //query rewriting
+  async rewriteQuery(
+    history: ChatMessage[],
+    question: string
+  ): Promise<string>{
+    const response = await this.groq.chat.completions.create({
+      model: this.configService.getOrThrow<string>('GROQ_MODEL'),
+      messages:[
+
+        {
+          role: 'system',
+          content: 
+          `
+          You rewrite search queries for a Retrieval-Augmented Generation (RAG) system.
+
+Rules:
+- Rewrite the user's latest question into a complete standalone search query.
+- Use the previous conversation only to resolve references like:
+  - it
+  - they
+  - that
+  - this
+  - he
+  - she
+  - why
+- Do NOT answer the question.
+- Return ONLY the rewritten query.
+- Keep it short and searchable.
+        
+          `,
+        },
+        ...history,
+        {
+          role: 'user',
+          content: question
+        }
+      ]
+    });
+      return response.choices[0]?.message?.content?.trim() ?? question;
+
   }
 }

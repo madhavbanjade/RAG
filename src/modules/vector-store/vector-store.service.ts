@@ -83,15 +83,60 @@ async getPoints(){
 async search(vector: number[]){
   const results = await this.client.query('documents', {
     query: vector,
-    limit: 5,
+    limit:10,
     with_payload: true
   })
-  return results.points.filter((item) => item.score >= 0.5).map((item) => ({
+
+  if (!results.points.length) {
+    return [];
+  }
+  console.log("========== SEARCH ==========");
+console.log("Total Results:", results.points.length);
+
+  const bestScore = results.points[0].score;
+//Math.max(0.29, 0.45)
+const threshold = Math.max(bestScore - 0.05, 0.45) 
+
+  const filtered = results.points.filter(
+    point => point.score >= threshold
+  )
+
+console.log("After Threshold:", filtered.length);
+
+  
+  const seen = new Set<string>();
+  const unique: typeof filtered = [];
+  for (const point of filtered){
+    const content = point.payload?.content;
+    if(typeof content !== 'string' || !content)
+      continue;
+    if(seen.has(content))
+      continue;
+    seen.add(content);
+    unique.push(point)
+  }
+  console.log("After Deduplication:", unique.length);
+
+  const selected = unique.slice(0,5)
+  console.log("Final Selected:", selected.length);
+
+
+  selected.forEach((item, index) => {
+  console.log(
+    `${index + 1}. Score=${item.score.toFixed(3)} | Chunk=${item.payload?.chunkId}`
+  );
+});
+
+console.log("============================");
+
+  return selected.map((item) => ({
     score: item.score,
     documentId: item.payload?.documentId,
     chunkId: item.payload?.chunkId,
     content: item.payload?.content
   }))
+
+  
 
   
 }

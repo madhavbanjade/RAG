@@ -324,13 +324,20 @@ async unarchiveConversation(
   .map((m) => `${m.role}: ${m.content}`)
   .join('\n');
 
-const searchQuery = `
-Conversation:
-${recentHistory}
 
-Current Question:
-${userMessage}
-`;
+
+
+  const rewrite = await this.llmService.rewriteQuery(
+    history.map((m) => ({
+      role: m.role,
+      content: m.content
+    })),
+    message
+  )
+  console.log("Original:", message);
+console.log("Rewritten:", rewrite);
+
+const searchQuery = rewrite?.trim().length ? rewrite : message;
 
       //embedded query
 
@@ -344,15 +351,31 @@ ${userMessage}
       const messages = [
         {
           role: 'system',
-          content: `You are an RAG assistant.
+          content: `
+          
+You are an intelligent AI assistant.
 
-Use ONLY the retrieved context.
+Your job is to answer questions using ONLY the retrieved context.
 
-If the context is empty, respond exactly:
+Rules:
 
+1. Use the retrieved context as your primary source.
+2. If the answer exists, explain it naturally.
+3. Never copy entire paragraphs.
+4. If the context is incomplete, answer only what is supported.
+5. If the answer cannot be found, reply:
 "I couldn't find that information in the uploaded documents."
+6. When appropriate, use bullet points.
+7. Keep answers concise unless the user requests detail.
+8. Consider previous conversation messages when the user asks follow-up questions like:
+   - "why?"
+   - "explain more"
+   - "what about the second one?"
+9. Never invent facts.
+10. Never mention internal implementation such as vectors, embeddings, or retrieval unless the user asks.
 
-Never answer using your own knowledge.`,
+
+          `,
         },
         {
           role: 'system',
