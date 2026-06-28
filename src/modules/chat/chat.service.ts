@@ -9,7 +9,9 @@ import { SuccessResponseHandler } from 'src/common/handlers/success-handlers';
 import { EmbeddingService } from '../embeddings/embeddings.service';
 import { VectorStoreService } from '../vector-store/vector-store.service';
 import { LlmService } from 'src/common/services/llm.service';
-import { chunkSchema } from '../chunking/schema/chunk.schema';
+import { IChunk } from '../chunking/schema/chunk.schema';
+import { IDocument } from '../documents/schema/documents.schema';
+import { RerankService } from 'src/common/services/rerank.service';
 
 @Injectable()
 export class ChatService {
@@ -18,11 +20,69 @@ export class ChatService {
     private readonly conversationModel: Model<Conversation>,
     @InjectModel('Message')
     private readonly messageModel: Model<Message>,
+    @InjectModel('Chunk')
+    private readonly chunkModel: Model<IChunk>,
+    @InjectModel('Document')
+    private readonly documentModel: Model<IDocument>,
 
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
     private readonly llmService: LlmService,
+    private readonly rerankService: RerankService
   ) {}
+
+  private async buildSources(chunks: any[]) {
+    const missingCitationChunkIds = chunks
+      .filter((item) => (!item.documentName || item.page === undefined) && item.chunkId)
+      .map((item) => item.chunkId);
+
+    if (!missingCitationChunkIds.length) {
+      return chunks.map((item) => ({
+        documentName: item.documentName,
+        page: item.page,
+        score: item.score,
+        rerankScore: item.rerankScore,
+      }));
+    }
+
+    const dbChunks = await this.chunkModel
+      .find({ _id: { $in: missingCitationChunkIds } })
+      .select('_id documentId metadata')
+      .lean();
+
+    const documentIds = [
+      ...new Set(dbChunks.map((chunk: any) => chunk.documentId?.toString()).filter(Boolean)),
+    ];
+
+    const documents = await this.documentModel
+      .find({ _id: { $in: documentIds } })
+      .select('_id title files.originalName')
+      .lean();
+
+    const chunkById = new Map(
+      dbChunks.map((chunk: any) => [chunk._id.toString(), chunk]),
+    );
+    const documentById = new Map(
+      documents.map((document: any) => [document._id.toString(), document]),
+    );
+
+    return chunks.map((item) => {
+      const dbChunk = item.chunkId ? chunkById.get(item.chunkId) : null;
+      const document = dbChunk?.documentId
+        ? documentById.get(dbChunk.documentId.toString())
+        : null;
+
+      return {
+        documentName:
+          item.documentName ||
+          document?.files?.[0]?.originalName ||
+          document?.title,
+        page: item.page ?? dbChunk?.metadata?.pageNumber ?? 1,
+        score: item.score,
+        rerankScore: item.rerankScore,
+      };
+    });
+  }
 
   //create conversation
   async createConversation(userId: string, title = 'New Chat') {
@@ -344,10 +404,15 @@ const searchQuery = rewrite?.trim().length ? rewrite : message;
       const vector = await this.embeddingService.generateEmbedding(searchQuery);
 
       //retrived chunks
-      const chunks = await this.vectorStoreService.search(vector);
+      const chunks = await this.vectorStoreService.search(vector, searchQuery);
+
+      const reranked = await this.rerankService.rerank(
+        searchQuery,
+        chunks
+      )
 
       //build context
-      const context = chunks.map((item: any) => item.content).join('\n\n');
+      const context = reranked.map((item: any) => item.content).join('\n\n');
       const messages = [
         {
           role: 'system',
@@ -388,6 +453,26 @@ Rules:
       ];
 
       const answer = await this.llmService.chat(messages);
+
+      const verification = await this.llmService.verify(
+        searchQuery,
+        context,
+        answer
+      )
+
+      if(!verification.grounded){
+        return{
+               answer:
+        "I couldn't confidently answer using the uploaded documents.",
+
+        sources: [],
+        verification,
+        }
+      }
+
+
+
+
    const titlePrompt = [
   {
     role: 'system',
@@ -426,11 +511,8 @@ await this.renameConversation(
 
       return {
         answer,
-        sources: chunks.map((item: any) => ({
-          documentId: item.documentId,
-          chunkId: item.chunkId,
-          score: item.score,
-        })),
+        sources: await this.buildSources(reranked),
+        verification,
       };
     }, 'Faild to send-message');
   }

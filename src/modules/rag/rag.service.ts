@@ -19,7 +19,7 @@ export class RagService {
     const queryVector = await this.embeddingService.generateEmbedding(question);
 
     //search qdrant
-    const results = await this.vectorStoreService.search(queryVector);
+    const results = await this.vectorStoreService.search(queryVector, question);
 
     //build context
     const context = results.map((r: any) => r.content).join('\n\n');

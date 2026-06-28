@@ -6,6 +6,7 @@ import { IChunk } from '../chunking/schema/chunk.schema';
 import { Model } from 'mongoose';
 import { ErrorHandler } from 'src/common/handlers/error-handlers';
 import { VectorStoreService } from '../vector-store/vector-store.service';
+import { IDocument } from '../documents/schema/documents.schema';
 
 @Injectable()
 export class EmbeddingService {
@@ -15,6 +16,9 @@ export class EmbeddingService {
 
     @InjectModel('Chunk')
     private readonly chunkModel: Model<IChunk>,
+
+    @InjectModel('Document')
+    private readonly documentModel: Model<IDocument>,
 
     private readonly vectorStoreService: VectorStoreService
   ) {}
@@ -42,6 +46,11 @@ export class EmbeddingService {
 
   //proces the chunk to embedded
   async processDocument(documentId: string) {
+    const document = await this.documentModel.findById(documentId);
+    if (!document) {
+      throw ErrorHandler.notFound('Document');
+    }
+
     const chunks = await this.chunkModel.find({
       documentId,
       embeddingStatus: 'PENDING',
@@ -55,8 +64,11 @@ export class EmbeddingService {
     }
 
     let embeddedCount = 0;
+    const documentName = document.files?.[0]?.originalName || document.title;
+
     for (const chunk of chunks) {
       const vector = await this.generateEmbedding(chunk.content);
+      const page = chunk.metadata?.pageNumber ?? 1;
 
    
 
@@ -64,8 +76,10 @@ export class EmbeddingService {
       await this.vectorStoreService.storeEmbedding(
         chunk._id!.toString(),
         chunk.documentId!.toString(),
+        documentName,
         vector,
         chunk.content,
+        page,
 
       )
 

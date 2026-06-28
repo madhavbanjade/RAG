@@ -22,7 +22,7 @@ export class VectorStoreController {
   @Post('test-search')
   async testSearch(@Body() body: { query: string }) {
     const vector = await this.embeddingService.generateEmbedding(body.query);
-    return this.vectorStoreService.search(vector);
+    return this.vectorStoreService.search(vector, body.query);
   }
 
   @Get('points')

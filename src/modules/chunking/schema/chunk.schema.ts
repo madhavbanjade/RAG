@@ -38,7 +38,7 @@ export const chunkSchema = new mongoose.Schema(
     metadata: {
       pageNumber: {
         type: Number,
-        dafault: null,
+        default: null,
       },
       section: {
         type: String,

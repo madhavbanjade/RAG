@@ -7,6 +7,7 @@ import { EmbeddingService } from './embeddings.service';
 import { chunkSchema } from '../chunking/schema/chunk.schema';
 import { VectorStoreModule } from '../vector-store/vector-store.module';
 import { JwtService } from '@nestjs/jwt';
+import { documentSchema } from '../documents/schema/documents.schema';
 
 
 @Module({
@@ -20,6 +21,10 @@ import { JwtService } from '@nestjs/jwt';
       {
         name: "Chunk",
         schema: chunkSchema
+      },
+      {
+        name: "Document",
+        schema: documentSchema
       },
     ])
   ],
