@@ -75,7 +75,7 @@ export class UsersController {
     return res.redirect(
       'https://accounts.google.com/o/oauth2/v2/auth?' +
       'client_id=' + process.env.GOOGLE_CLIENT_ID +
-      '&redirect_uri=' + encodeURIComponent('http://localhost:2026/api/v1/users/google-callback') +
+      '&redirect_uri=' + encodeURIComponent(`http://localhost:${process.env.PORT || 2000}/api/v1/users/google-callback`) +
       '&response_type=code' +
       '&scope=' + encodeURIComponent('openid email profile'),
     );
@@ -95,7 +95,7 @@ export class UsersController {
     try {
       const result = await this.usersService.googleSignIn(req.user);
       setAuthCookies(req, res, result.data.access_token, result.data.refresh_token);
-      return res.redirect(`${frontendUrl}/dashboard`);
+      return res.redirect(`${frontendUrl}`);
     } catch {
       return res.redirect(`${frontendUrl}/login?error=authentication_failed`);
     }

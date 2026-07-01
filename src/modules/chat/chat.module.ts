@@ -11,6 +11,7 @@ import { LlmService } from 'src/common/services/llm.service';
 import { chunkSchema } from '../chunking/schema/chunk.schema';
 import { documentSchema } from '../documents/schema/documents.schema';
 import { RerankService } from 'src/common/services/rerank.service';
+import { RedisService } from 'src/common/services/redis.service';
 
 @Module({
   imports: [
@@ -24,6 +25,6 @@ import { RerankService } from 'src/common/services/rerank.service';
     VectorStoreModule,
   ],
   controllers: [ChatController],
-  providers: [ChatService, JwtService, LlmService, RerankService],
+  providers: [ChatService, JwtService, LlmService, RerankService, RedisService],
 })
 export class ChatModule {}

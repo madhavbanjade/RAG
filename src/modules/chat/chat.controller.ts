@@ -11,12 +11,10 @@ export class ChatController {
   @Post('conversation')
   @UseGuards(ProtectLoginGuard)
   async creatConversation(
-   @Req() req,
-    @Body() body
+    @Req() req,
   ){
     return this.chatService.createConversation(
       req.user.id,
-      body.title
     )
   }
 

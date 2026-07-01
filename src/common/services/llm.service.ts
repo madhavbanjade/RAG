@@ -55,13 +55,8 @@ export class LlmService {
         messages,
       });
 
-  const content = response.choices[0]?.message?.content;
-
-if (!content) {
-    throw new Error("Groq returned empty response");
-}
-
-return content;
+  const content = response.choices[0]?.message?.content?.trim();
+  return content || '';
   }
 
 

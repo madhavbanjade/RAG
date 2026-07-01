@@ -12,6 +12,12 @@ import { LlmService } from 'src/common/services/llm.service';
 import { IChunk } from '../chunking/schema/chunk.schema';
 import { IDocument } from '../documents/schema/documents.schema';
 import { RerankService } from 'src/common/services/rerank.service';
+import { RedisService } from 'src/common/services/redis.service';
+
+const TTL = {
+  conversations: 30,  // user conversation list — short so new chats appear fast
+  history: 30,        // chat history — invalidated on every new message
+};
 
 @Injectable()
 export class ChatService {
@@ -28,25 +34,35 @@ export class ChatService {
     private readonly embeddingService: EmbeddingService,
     private readonly vectorStoreService: VectorStoreService,
     private readonly llmService: LlmService,
-    private readonly rerankService: RerankService
+    private readonly rerankService: RerankService,
+    private readonly redisService: RedisService,
   ) {}
 
-  private async buildSources(chunks: any[]) {
-    const missingCitationChunkIds = chunks
-      .filter((item) => (!item.documentName || item.page === undefined) && item.chunkId)
-      .map((item) => item.chunkId);
+  private cacheKey = {
+    conversations: (userId: string) => `chat:conversations:${userId}`,
+    history: (conversationId: string) => `chat:history:${conversationId}`,
+  };
 
-    if (!missingCitationChunkIds.length) {
-      return chunks.map((item) => ({
-        documentName: item.documentName,
-        page: item.page,
-        score: item.score,
-        rerankScore: item.rerankScore,
-      }));
+  private async invalidateUserCache(userId: string, conversationId?: string) {
+    await this.redisService.del(this.cacheKey.conversations(userId));
+    if (conversationId) {
+      await this.redisService.del(this.cacheKey.history(conversationId));
     }
+  }
+
+  private async buildSources(chunks: any[]) {
+    // Only show sources that genuinely contributed to the answer
+    const relevant = chunks
+      .filter((item) => (item.rerankScore ?? 0) >= 0.1)
+      .sort((a, b) => (b.rerankScore ?? 0) - (a.rerankScore ?? 0))
+      .slice(0, 3);
+
+    if (!relevant.length) return [];
+
+    const chunkIds = relevant.map((item) => item.chunkId).filter(Boolean);
 
     const dbChunks = await this.chunkModel
-      .find({ _id: { $in: missingCitationChunkIds } })
+      .find({ _id: { $in: chunkIds } })
       .select('_id documentId metadata')
       .lean();
 
@@ -66,26 +82,39 @@ export class ChatService {
       documents.map((document: any) => [document._id.toString(), document]),
     );
 
-    return chunks.map((item) => {
-      const dbChunk = item.chunkId ? chunkById.get(item.chunkId) : null;
+    const seen = new Set<string>();
+    const sources: { documentName: string; page: number; score: number; rerankScore: number }[] = [];
+
+    for (const item of relevant) {
+      const dbChunk = item.chunkId ? chunkById.get(String(item.chunkId)) : null;
       const document = dbChunk?.documentId
-        ? documentById.get(dbChunk.documentId.toString())
+        ? documentById.get((dbChunk as any).documentId.toString())
         : null;
 
-      return {
-        documentName:
-          item.documentName ||
-          document?.files?.[0]?.originalName ||
-          document?.title,
-        page: item.page ?? dbChunk?.metadata?.pageNumber ?? 1,
-        score: item.score,
-        rerankScore: item.rerankScore,
-      };
-    });
+      // Prefer MongoDB (authoritative), fall back to Qdrant payload
+      const documentName =
+        (document as any)?.files?.[0]?.originalName ||
+        (document as any)?.title ||
+        item.documentName ||
+        null;
+
+      if (!documentName) continue;
+
+      const page: number = (dbChunk as any)?.metadata?.pageNumber ?? item.page ?? 1;
+      const key = `${documentName}::${page}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      sources.push({ documentName, page, score: item.score, rerankScore: item.rerankScore });
+    }
+
+    return sources;
   }
 
   //create conversation
-  async createConversation(userId: string, title = 'New Chat') {
+  async createConversation(
+    userId: string, title = 'New Chat'
+  ) {
     const conversation = await this.conversationModel.create({
       userId,
       title,
@@ -94,6 +123,14 @@ export class ChatService {
     if (!conversation) {
       throw ErrorHandler.notFound(conversation);
     }
+
+    await this.messageModel.create({
+      conversationId: conversation._id,
+      role: 'assistant',
+      content: "Hi! I'm your Raag AI assistant. Ask me anything about your uploaded documents and I'll do my best to help.",
+    });
+
+    await this.redisService.del(this.cacheKey.conversations(userId));
 
     return SuccessResponseHandler.created('Conversation', conversation);
   }
@@ -120,6 +157,8 @@ async renameConversation(
   if (!conversation) {
     throw ErrorHandler.notFound('Conversation');
   }
+
+  await this.invalidateUserCache(userId, conversationId);
 
   return SuccessResponseHandler.updated(
     'Conversation',
@@ -221,6 +260,10 @@ async searchConverations(
 
   //get chat history
   async getChatHistory(conversationId: string, limit: 20) {
+    const cacheKey = this.cacheKey.history(conversationId);
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+
     const chat = await this.messageModel
       .find({ conversationId })
       .sort({ createdAt: 1 })
@@ -230,7 +273,9 @@ async searchConverations(
       throw ErrorHandler.notFound('Chat Hisotry');
     }
 
-    return SuccessResponseHandler.retrived('Chat History', chat);
+    const result = SuccessResponseHandler.retrived('Chat History', chat);
+    await this.redisService.set(cacheKey, JSON.stringify(result), TTL.history);
+    return result;
   }
 
   //getall
@@ -239,6 +284,10 @@ async getUserConversations(
   page = 1,
   limit = 10,
 ) {
+  const cacheKey = this.cacheKey.conversations(userId);
+  const cached = await this.redisService.get(cacheKey);
+  if (cached) return JSON.parse(cached);
+
   const skip = (page - 1) * limit;
 
   const [conversations, total] =
@@ -260,16 +309,14 @@ async getUserConversations(
       }),
     ]);
 
-  return SuccessResponseHandler.retrived(
+  const result = SuccessResponseHandler.retrived(
     "Conversations",
-    {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      conversations,
-    },
+    { page, limit, total, totalPages: Math.ceil(total / limit), conversations },
   );
+
+  await this.redisService.set(cacheKey, JSON.stringify(result), TTL.conversations);
+
+  return result;
 }
 
 
@@ -300,6 +347,8 @@ async archiveConversation(
     throw ErrorHandler.notFound("Conversation");
   }
 
+  await this.invalidateUserCache(userId, conversationId);
+
   return SuccessResponseHandler.updated(
     "Conversation archived",
     conversation,
@@ -329,6 +378,8 @@ async unarchiveConversation(
     throw ErrorHandler.notFound("Conversation");
   }
 
+  await this.invalidateUserCache(userId, conversationId);
+
   return SuccessResponseHandler.updated(
     "Conversation restored",
     conversation,
@@ -337,13 +388,21 @@ async unarchiveConversation(
 
   // Delete Conversation
   async deleteConversation(conversationId: string) {
-    await this.messageModel.deleteMany({
-      conversationId,
-    });
+    const conversation = await this.conversationModel.findById(conversationId).select('userId').lean();
 
+    await this.messageModel.deleteMany({ conversationId });
     await this.conversationModel.findByIdAndDelete(conversationId);
 
+    if (conversation?.userId) {
+      await this.invalidateUserCache(String(conversation.userId), conversationId);
+    }
+
     return SuccessResponseHandler.deleted('Convesation');
+  }
+
+  private isGreeting(text: string): boolean {
+    const greetings = /^\s*(hi+|hey+|hello+|howdy|sup|what'?s up|good\s*(morning|afternoon|evening|day)|greetings|hiya|yo)\b[!?.]*\s*$/i;
+    return greetings.test(text.trim());
   }
 
   //send message
@@ -372,7 +431,21 @@ async unarchiveConversation(
         role: 'user',
         content: userMessage,
       });
-      console.log("convo2", conversationId)
+
+      if (this.isGreeting(userMessage)) {
+        const reply = await this.llmService.chat([
+          {
+            role: 'system',
+            content: `You are Raag, a friendly AI assistant that helps users explore their uploaded documents.
+When greeted, if user include hi, hy, hello, what's up respond warmly and briefly — one or two sentences max.
+Let the user know you are ready to answer questions about their documents.
+Do not mention technical details like embeddings or retrieval.`,
+          },
+          { role: 'user', content: userMessage },
+        ]);
+        await this.messageModel.create({ conversationId, role: 'assistant', content: reply });
+        return { answer: reply, sources: [], verification: { grounded: true } };
+      }
 
       const history = await this.messageModel
         .find({ conversationId })
@@ -452,7 +525,19 @@ Rules:
         })),
       ];
 
-      const answer = await this.llmService.chat(messages);
+      let answer: string;
+      try {
+        answer = await this.llmService.chat(messages);
+      } catch {
+        answer = '';
+      }
+
+      if (!answer) {
+        const fallback = "I'm having trouble generating a response right now. Please try again.";
+        await this.messageModel.create({ conversationId, role: 'assistant', content: fallback });
+        await this.invalidateUserCache(userId, conversationId);
+        return { answer: fallback, sources: [], verification: { grounded: false } };
+      }
 
       const verification = await this.llmService.verify(
         searchQuery,
@@ -461,13 +546,13 @@ Rules:
       )
 
       if(!verification.grounded){
-        return{
-               answer:
-        "I couldn't confidently answer using the uploaded documents.",
-
-        sources: [],
-        verification,
-        }
+        const fallback = "I couldn't confidently answer using the uploaded documents.";
+        await this.messageModel.create({
+          conversationId,
+          role: 'assistant',
+          content: fallback,
+        });
+        return{ answer: fallback, sources: [], verification };
       }
 
 
@@ -492,14 +577,12 @@ Rules:
   },
 ];
 
-const title =
-  await this.llmService.chat(titlePrompt);
-
-await this.renameConversation(
-  conversationId,
-  userId,
-  title.trim(),
-);
+try {
+  const title = await this.llmService.chat(titlePrompt);
+  if (title?.trim()) {
+    await this.renameConversation(conversationId, userId, title.trim());
+  }
+} catch { /* title generation is best-effort */ }
 
 
     //save assistent message
@@ -508,6 +591,8 @@ await this.renameConversation(
         role: 'assistant',
         content: answer,
       });
+
+      await this.invalidateUserCache(userId, conversationId);
 
       return {
         answer,
